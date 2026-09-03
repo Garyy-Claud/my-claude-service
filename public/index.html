@@ -28,7 +28,7 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  chat.innerHTML += <div class="msg user"><b>Вы:</b> ${text}</div>;
+  chat.innerHTML += `<div class="msg user"><b>Вы:</b> ${text}</div>`;
   input.value = '';
   chat.scrollTop = chat.scrollHeight;
 
@@ -39,7 +39,7 @@ async function sendMessage() {
   });
   const data = await response.json();
 
-  chat.innerHTML += <div class="msg bot"><b>Ассистент:</b> ${data.reply}</div>;
+  chat.innerHTML += `<div class="msg bot"><b>Ассистент:</b> ${data.reply}</div>`;
   chat.scrollTop = chat.scrollHeight;
 }
 
