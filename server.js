@@ -241,3 +241,6 @@ process.on('SIGINT', () => {
   console.log('🛑 Получен SIGINT. Завершаем работу...');
   process.exit(0);
 });
+app.listen(port, () => {
+  console.log('Сервер запущен' + port);
+});
