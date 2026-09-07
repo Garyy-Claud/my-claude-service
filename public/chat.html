@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Мой чат-сервис</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.js"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -51,6 +52,23 @@
     word-wrap: break-word;
     animation: fadeIn 0.3s ease-in;
   }
+  .msg p { margin: 0 0 8px 0; }
+  .msg p:last-child { margin-bottom: 0; }
+  .msg pre {
+    background: rgba(0,0,0,0.06);
+    padding: 8px 10px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 13px;
+  }
+  .msg code {
+    background: rgba(0,0,0,0.08);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .msg pre code { background: none; padding: 0; }
+  .msg ul, .msg ol { margin: 4px 0; padding-left: 20px; }
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -72,12 +90,30 @@
     color: #64748b;
     font-style: italic;
   }
+  .msg-image {
+    max-width: 100%;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    display: block;
+  }
   .input-area {
     display: flex;
+    align-items: center;
     padding: 16px;
-    gap: 10px;
+    gap: 8px;
     border-top: 1px solid #e2e8f0;
   }
+  #attachBtn {
+    padding: 10px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  #attachBtn:hover { background: #f1f5f9; }
   #input {
     flex: 1;
     padding: 12px 16px;
@@ -86,6 +122,7 @@
     font-size: 15px;
     outline: none;
     transition: border-color 0.2s;
+    min-width: 0;
   }
   #input:focus { border-color: #6366f1; }
   #input:disabled {
@@ -102,6 +139,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s, opacity 0.2s;
+    flex-shrink: 0;
   }
   #send:hover:not(:disabled) { background: #4f46e5; }
   #send:disabled {
@@ -112,13 +150,38 @@
     background: #fee2e2 !important;
     color: #991b1b !important;
   }
+  #filePreview {
+    display: none;
+    padding: 0 16px 12px;
+    align-items: center;
+    gap: 8px;
+  }
+  #filePreview img {
+    max-width: 70px;
+    max-height: 70px;
+    border-radius: 8px;
+    object-fit: cover;
+  }
+  #filePreview button {
+    border: none;
+    background: #e2e8f0;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+  }
 </style>
 </head>
 <body>
 <div class="app">
   <div class="header">Мой чат-сервис</div>
   <div id="chat"></div>
+  <div id="filePreview"></div>
   <div class="input-area">
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <button id="attachBtn" title="Прикрепить фото">📎</button>
     <input id="input" type="text" placeholder="Напишите сообщение...">
     <button id="send">Отправить</button>
   </div>
@@ -128,6 +191,44 @@
 const chat = document.getElementById('chat');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
+const fileInput = document.getElementById('fileInput');
+const attachBtn = document.getElementById('attachBtn');
+const filePreview = document.getElementById('filePreview');
+
+let selectedImageBase64 = null;
+let selectedImageMediaType = null;
+
+// Открыть выбор файла по клику на скрепку
+attachBtn.addEventListener('click', () => fileInput.click());
+
+// Когда пользователь выбрал файл
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    selectedImageBase64 = e.target.result.split(',')[1];
+    selectedImageMediaType = file.type;
+
+    filePreview.innerHTML = `
+      <img src="${e.target.result}">
+      <span style="font-size:13px; color:#64748b;">${escapeHtml(file.name)}</span>
+      <button onclick="clearImage()">✕</button>
+    `;
+    filePreview.style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+});
+
+// Убрать прикреплённое фото
+function clearImage() {
+  selectedImageBase64 = null;
+  selectedImageMediaType = null;
+  fileInput.value = '';
+  filePreview.style.display = 'none';
+  filePreview.innerHTML = '';
+}
 
 // Функция для безопасной вставки текста (защита от XSS)
 function escapeHtml(text) {
@@ -136,7 +237,7 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Функция для создания сообщения
+// Функция для создания сообщения (обычный текст, без Markdown — используется для пользователя)
 function createMessage(text, className) {
   const msg = document.createElement('div');
   msg.className = `msg ${className}`;
@@ -144,18 +245,44 @@ function createMessage(text, className) {
   return msg;
 }
 
+// Создание сообщения пользователя, с картинкой (если есть) и текстом
+function createUserMessage(text, imageDataUrl) {
+  const msg = document.createElement('div');
+  msg.className = 'msg user';
+  if (imageDataUrl) {
+    const img = document.createElement('img');
+    img.src = imageDataUrl;
+    img.className = 'msg-image';
+    msg.appendChild(img);
+  }
+  if (text) {
+    const textNode = document.createElement('div');
+    textNode.textContent = text;
+    msg.appendChild(textNode);
+  }
+  return msg;
+}
+
 async function sendMessage() {
   const text = input.value.trim();
-  if (!text) return;
+  const hasImage = !!selectedImageBase64;
+
+  if (!text && !hasImage) return;
 
   // Блокируем интерфейс во время отправки
   input.disabled = true;
   sendBtn.disabled = true;
+  attachBtn.disabled = true;
 
-  // Добавляем сообщение пользователя
-  const userMsg = createMessage(text, 'user');
+  // Сохраняем картинку для превью в сообщении пользователя (до очистки)
+  const imagePreviewUrl = hasImage
+    ? `data:${selectedImageMediaType};base64,${selectedImageBase64}`
+    : null;
+
+  // Добавляем сообщение пользователя (текст + картинка, если есть)
+  const userMsg = createUserMessage(text, imagePreviewUrl);
   chat.appendChild(userMsg);
-  
+
   input.value = '';
   chat.scrollTop = chat.scrollHeight;
 
@@ -164,38 +291,42 @@ async function sendMessage() {
   chat.appendChild(loadingMsg);
   chat.scrollTop = chat.scrollHeight;
 
+  // Готовим данные для отправки на сервер
+  const payload = { message: text };
+  if (hasImage) {
+    payload.image = selectedImageBase64;
+    payload.imageMediaType = selectedImageMediaType;
+  }
+
+  // Очищаем прикреплённый файл сразу после того, как забрали данные
+  clearImage();
+
   try {
-    // Отправляем запрос к серверу
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify(payload)
     });
 
-    // Проверяем статус ответа
     if (!response.ok) {
       throw new Error(`Ошибка сервера: ${response.status}`);
     }
 
     const data = await response.json();
-
-    // Проверяем наличие ответа
     const reply = data.reply || 'Извините, я не понял ваш запрос.';
-    
-    // Заменяем индикатор загрузки на ответ бота
+
+    // Заменяем индикатор загрузки на ответ бота с Markdown-разметкой
     loadingMsg.className = 'msg bot';
-    loadingMsg.textContent = reply;
+    loadingMsg.innerHTML = marked.parse(reply);
 
   } catch (error) {
     console.error('Ошибка при отправке:', error);
-    
-    // Показываем сообщение об ошибке
     loadingMsg.className = 'msg bot error-msg';
     loadingMsg.textContent = '❌ Ошибка соединения. Проверьте интернет и попробуйте снова.';
   } finally {
-    // Разблокируем интерфейс
     input.disabled = false;
     sendBtn.disabled = false;
+    attachBtn.disabled = false;
     input.focus();
     chat.scrollTop = chat.scrollHeight;
   }
