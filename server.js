@@ -36,6 +36,8 @@ try {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Добавлено для поддержки форм
 
+app.set('trust proxy', 1);
+
 // Настройка сессий с безопасными параметрами
 app.use(session({
   secret: process.env.SESSION_SECRET,
