@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #f0f4f8 0%, #d9e4f0 100%);
+    height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .box {
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    width: 320px;
+  }
+  h2 { 
+    margin-top: 0; 
+    color: #1e293b;
+    margin-bottom: 20px;
+  }
+  .form-group {
+    margin-bottom: 16px;
+  }
+  label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #475569;
+    margin-bottom: 4px;
+  }
+  input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 15px;
+    transition: border-color 0.2s;
+  }
+  input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+  input:disabled {
+    background: #f1f5f9;
+    cursor: not-allowed;
+  }
+  button {
+    width: 100%;
+    padding: 12px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+  }
+  button:hover:not(:disabled) { 
+    background: #4f46e5; 
+  }
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  #error {
+    color: #dc2626;
+    font-size: 14px;
+    margin-top: 12px;
+    text-align: center;
+    min-height: 20px;
+  }
+  #error.success {
+    color: #16a34a;
+  }
+  .loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>🔐 Вход для администратора</h2>
+  
+  <div class="form-group">
+    <label for="username">Логин</label>
+    <input id="username" type="text" placeholder="Введите логин" autocomplete="username" required>
+  </div>
+  
+  <div class="form-group">
+    <label for="password">Пароль</label>
+    <input id="password" type="password" placeholder="Введите пароль" autocomplete="current-password" required>
+  </div>
+  
+  <button id="loginBtn">Войти</button>
+  <div id="error"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('loginBtn');
+  const errorDiv = document.getElementById('error');
+
+  // Функция для очистки сообщения об ошибке
+  function clearError() {
+    errorDiv.textContent = '';
+    errorDiv.className = '';
+  }
+
+  // Функция для показа ошибки
+  function showError(message) {
+    errorDiv.textContent = message;
+    errorDiv.className = 'error';
+  }
+
+  // Функция для показа успешного сообщения
+  function showSuccess(message) {
+    errorDiv.textContent = message;
+    errorDiv.className = 'success';
+  }
+
+  // Блокировка/разблокировка интерфейса
+  function setLoading(isLoading) {
+    usernameInput.disabled = isLoading;
+    passwordInput.disabled = isLoading;
+    loginBtn.disabled = isLoading;
+    
+    if (isLoading) {
+      loginBtn.innerHTML = '<span class="loading-spinner"></span> Вход...';
+    } else {
+      loginBtn.textContent = 'Войти';
+    }
+  }
+
+  // Валидация полей
+  function validateForm() {
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
+    
+    if (!username) {
+      showError('Введите логин');
+      usernameInput.focus();
+      return false;
+    }
+    
+    if (!password) {
+      showError('Введите пароль');
+      passwordInput.focus();
+      return false;
+    }
+    
+    if (password.length < 4) {
+      showError('Пароль должен содержать минимум 4 символа');
+      passwordInput.focus();
+      return false;
+    }
+    
+    clearError();
+    return true;
+  }
+
+  // Обработчик входа
+  async function handleLogin() {
+    // Очищаем предыдущие сообщения
+    clearError();
+    
+    // Валидация
+    if (!validateForm()) {
+      return;
+    }
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    // Блокируем интерфейс
+    setLoading(true);
+
+    try {
+      // Отправляем запрос на сервер
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ username, password })
+      });
+
+      // Проверяем статус ответа
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Ошибка сервера: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Проверяем успешность входа
+      if (data.success) {
+        showSuccess('✅ Вход выполнен! Перенаправление...');
+        
+        // Задержка перед редиректом для показа сообщения
+        setTimeout(() => {
+          window.location.href = data.redirect || '/';
+        }, 500);
+      } else {
+        showError(data.message || '❌ Неверный логин или пароль');
+        passwordInput.value = ''; // Очищаем поле пароля
+        passwordInput.focus();
+      }
+    } catch (error) {
+      console.error('Ошибка при входе:', error);
+      
+      // Обработка ошибок сети
+      if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+        showError('⚠️ Ошибка соединения с сервером. Проверьте интернет-соединение.');
+      } else {
+        showError(error.message || '⚠️ Произошла ошибка при входе. Попробуйте позже.');
+      }
+    } finally {
+      // Разблокируем интерфейс
+      setLoading(false);
+    }
+  }
+
+  // Обработчики событий
+  loginBtn.addEventListener('click', handleLogin);
+
+  // Вход по клавише Enter
+  const inputs = [usernameInput, passwordInput];
+  inputs.forEach(input => {
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleLogin();
+      }
+    });
+  });
+
+  // Очистка сообщения об ошибке при вводе
+  inputs.forEach(input => {
+    input.addEventListener('input', clearError);
+  });
+
+  // Автофокус на поле логина
+  usernameInput.focus();
+});
+</script>
+</body>
+</html>
