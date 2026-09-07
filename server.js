@@ -179,7 +179,7 @@ app.post('/api/chat', checkAuth, async (req, res) => {
 
     // Отправка запроса к Anthropic
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022', // Исправлено название модели
+      model: 'claude-sonnet-4-5', // Исправлено название модели
       max_tokens: 1024,
       messages: [{ 
         role: 'user', 
