@@ -34,8 +34,8 @@ try {
 }
 
 // Увеличенный лимит размера тела запроса — нужен для передачи фото в формате base64
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Сервер работает за прокси Render — нужно для корректной работы secure-cookie
 app.set('trust proxy', 1);
@@ -196,8 +196,11 @@ app.post('/api/chat', checkAuth, async (req, res) => {
     }
 
     // Отправка запроса к Anthropic
+    console.log('⏳ Отправляю запрос к Anthropic...');
+    const startTime = Date.now();
+
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1024,
       messages: [{
         role: 'user',
@@ -205,7 +208,11 @@ app.post('/api/chat', checkAuth, async (req, res) => {
       }],
       temperature: 0.7,
       system: "Вы полезный ассистент, который отвечает на русском языке."
+    }, {
+      timeout: 25000 // 25 секунд — принудительный обрыв, если Anthropic не отвечает вовремя
     });
+
+    console.log(`✅ Ответ от Anthropic получен за ${Date.now() - startTime} мс`);
 
     // Извлечение ответа
     const reply = response.content && response.content[0] && response.content[0].text
@@ -224,6 +231,8 @@ app.post('/api/chat', checkAuth, async (req, res) => {
       return res.status(429).json({ error: 'Превышен лимит запросов. Попробуйте позже' });
     } else if (error.type === 'rate_limit_error') {
       return res.status(429).json({ error: 'Слишком много запросов. Подождите немного' });
+    } else if (error.name === 'APIConnectionTimeoutError' || error.message?.includes('timeout')) {
+      return res.status(504).json({ error: 'Anthropic не ответил вовремя. Попробуйте ещё раз' });
     }
 
     res.status(500).json({
